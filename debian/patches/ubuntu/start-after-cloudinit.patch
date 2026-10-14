@@ -1,0 +1,23 @@
+From: Sebastien Bacher <seb128@ubuntu.com>
+Date: Wed, 14 Dec 2022 08:51:03 +0100
+Subject: start after cloudinit
+
+---
+ data/gdm.service.in | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/data/gdm.service.in b/data/gdm.service.in
+index 1214c3f..cabd45a 100644
+--- a/data/gdm.service.in
++++ b/data/gdm.service.in
+@@ -15,6 +15,10 @@ After=${PLYMOUTH_QUIT_SERVICE}
+ # plymouth is quit, which we do)
+ After=rc-local.service plymouth-start.service systemd-user-sessions.service
+ 
++# Start after cloud init is done generating the system configuration
++# otherwise we might end up getting the wrong locale for example
++After=cloud-config.service
++
+ # GDM takes responsibility for stopping plymouth, so if it fails
+ # for any reason, make sure plymouth still stops
+ OnFailure=plymouth-quit.service

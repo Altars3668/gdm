@@ -1,0 +1,138 @@
+From: Gunnar Hjalmarsson <gunnarhj@ubuntu.com>
+Date: Tue, 7 Aug 2018 11:15:57 +0100
+Subject: Show warning dialog in case of error in ~/.profile etc.
+
+By using bash instead of sh, a syntax error in a sourced file does
+not cause a fatal error, but the user is alerted via a dialog in the
+same way as for other types of errors.
+Bug-Ubuntu: https://launchpad.net/bugs/678421
+Forwarded: https://bugzilla.gnome.org/738970
+---
+ data/Xsession.in            | 29 +++++++++++++++++++++++------
+ data/config-error-dialog.sh | 33 +++++++++++++++++++++++++++++++++
+ data/meson.build            |  7 ++++++-
+ po/POTFILES.in              |  1 +
+ 4 files changed, 63 insertions(+), 7 deletions(-)
+ create mode 100644 data/config-error-dialog.sh
+
+diff --git a/data/Xsession.in b/data/Xsession.in
+index dab24ce..7926ebe 100755
+--- a/data/Xsession.in
++++ b/data/Xsession.in
+@@ -29,21 +29,38 @@ command="$@"
+ # good for debugging where things went wrong
+ echo "$0: Beginning session setup..."
+ 
++# temporary storage of error messages
++ERR=$(mktemp --tmpdir gdm3-config-err-XXXXXX)
++
++source_with_error_check () {
++  CONFIG_FILE="$1"
++  . "$CONFIG_FILE" 2>"$ERR"
++  if [ -s "$ERR" ]; then
++    . /etc/gdm3/config-error-dialog.sh
++  fi
++  cat "$ERR" >&2
++  truncate -s 0 "$ERR"
++}
++
+ # First read /etc/profile (resp. /usr/etc/profile) and .profile
+ if [ -f /etc/profile ]; then
+-  . /etc/profile
++  source_with_error_check /etc/profile
+ elif [ -f /usr/etc/profile ]; then
+-  . /usr/etc/profile
++  source_with_error_check /usr/etc/profile
++fi
++if [ -f "$HOME/.profile" ]; then
++  source_with_error_check "$HOME/.profile"
+ fi
+-test -f "$HOME/.profile" && . "$HOME/.profile"
+ # Second read /etc/xprofile (resp. /usr/etc/xprofile)  and .xprofile for X specific setup
+ if [ -f /etc/xprofile ]; then
+-  . /etc/xprofile
++  source_with_error_check /etc/xprofile
+ elif [ -f /usr/etc/xprofile ]; then
+-  . /usr/etc/xprofile
++  source_with_error_check /usr/etc/xprofile
+ 
+ fi
+-test -f "$HOME/.xprofile" && . "$HOME/.xprofile"
++if [ -f "$HOME/.xprofile" ]; then
++  source_with_error_check "$HOME/.xprofile"
++fi
+ 
+ # Translation stuff
+ if [ -x "@libexecdir@/gdmtranslate" ] ; then
+diff --git a/data/config-error-dialog.sh b/data/config-error-dialog.sh
+new file mode 100644
+index 0000000..fb12366
+--- /dev/null
++++ b/data/config-error-dialog.sh
+@@ -0,0 +1,33 @@
++# Copyright (C) 2014 Canonical Ltd
++# Author: Gunnar Hjalmarsson <gunnarhj@ubuntu.com>
++#
++# This program is free software: you can redistribute it and/or modify it under
++# the terms of the GNU General Public License as published by the Free Software
++# Foundation, version 3 of the License.
++#
++# See http://www.gnu.org/copyleft/gpl.html the full text of the license.
++
++# This file may be sourced by the function source_with_error_check() in
++# /etc/gdm/Xsession
++
++export TEXTDOMAIN=gdm
++. /usr/bin/gettext.sh
++
++PARA1=$(eval_gettext 'Error found when loading $CONFIG_FILE:')
++PARA2=$(gettext 'As a result the session will not be configured correctly.
++You should fix the problem as soon as feasible.')
++
++TEXT="$PARA1
++
++$(fold -s $ERR)
++
++$PARA2"
++
++if [ -x /usr/bin/kdialog ]; then
++	TEXT_FILE=$(mktemp --tmpdir config-err-kdialog-XXXXXX)
++	echo -n "$TEXT" > "$TEXT_FILE"
++	kdialog --textbox "$TEXT_FILE" 500 300
++	rm -f "$TEXT_FILE"
++elif [ -x /usr/bin/zenity ]; then
++	zenity --warning --no-wrap --no-markup --text="$TEXT"
++fi
+diff --git a/data/meson.build b/data/meson.build
+index 684f4c2..f0f668a 100644
+--- a/data/meson.build
++++ b/data/meson.build
+@@ -166,10 +166,15 @@ if get_option('gdm-xsession') and have_x11_support
+     output: '@BASENAME@',
+     configuration: {
+       'libexecdir': gdm_prefix / get_option('libexecdir'),
+-      'XSESSION_SHELL': get_option('solaris')? '/bin/ksh' : '/bin/sh',
++      'XSESSION_SHELL': get_option('solaris')? '/bin/ksh' : '/bin/bash',
+     },
+     install_dir: gdmconfdir,
+   )
++
++  install_data(
++    'config-error-dialog.sh',
++    install_dir: gdmconfdir,
++  )
+ endif
+ 
+ # Polkit
+diff --git a/po/POTFILES.in b/po/POTFILES.in
+index 8f9f035..c387a17 100644
+--- a/po/POTFILES.in
++++ b/po/POTFILES.in
+@@ -30,6 +30,7 @@ daemon/gdm-x-session.c
+ daemon/main.c
+ daemon/session-worker-main.c
+ daemon/test-session-client.c
++data/config-error-dialog.sh
+ data/gnome-greeter.desktop.in
+ data/gnome-initial-setup.desktop.in
+ data/org.gnome.displaymanager.policy

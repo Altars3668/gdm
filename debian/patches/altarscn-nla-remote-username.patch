@@ -1,0 +1,33 @@
+Description: 将 NLA 已认证用户名传递给远程显示器自动登录
+Author: AltarsCN
+Forwarded: no
+
+--- a/daemon/gdm-remote-display-factory.c
++++ b/daemon/gdm-remote-display-factory.c
+@@ -85,6 +85,7 @@
+ {
+         g_autofree char *remote_id = NULL;
+         g_autofree char *remote_hostname = NULL;
++        g_autofree char *autologin_user = NULL;
+ 
+         g_variant_lookup (properties, "remote-id", "o", &remote_id);
+         if (!remote_id) {
+@@ -97,7 +98,17 @@
+ 
+         g_variant_lookup (properties, "hostname", "s", &remote_hostname);
+ 
+-        if (!gdm_remote_display_factory_create_display (factory, NULL, remote_id, remote_hostname))
++        /* altarscn: allow an already-authorized caller (gnome-remote-desktop,
++         * which has NLA-authenticated the user) to request passwordless
++         * auto-login of a specific user via the display's autologin-user,
++         * instead of presenting the greeter. Optional + backward-compatible:
++         * when the "username" property is absent, autologin_user stays NULL and
++         * the greeter is shown exactly as before. This grants no capability
++         * beyond the existing CreateUserDisplay method (same authorized callers,
++         * same passwordless autologin path). */
++        g_variant_lookup (properties, "username", "s", &autologin_user);
++
++        if (!gdm_remote_display_factory_create_display (factory, autologin_user, remote_id, remote_hostname))
+                 g_dbus_method_invocation_return_error_literal (invocation,
+                                                                G_DBUS_ERROR,
+                                                                G_DBUS_ERROR_FAILED,

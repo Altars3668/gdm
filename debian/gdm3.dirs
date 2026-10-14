@@ -1,0 +1,2 @@
+usr/lib/systemd/user/snapd.session-agent.socket.d
+usr/lib/systemd/user/snap.prompting-client.daemon.service.d

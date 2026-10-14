@@ -1,0 +1,11 @@
+{
+  "component": "gdm",
+  "source_package": "gdm3",
+  "base_version": "50.0-0ubuntu1+altarscn1",
+  "upstream_archive": "gdm3_50.0.orig.tar.xz",
+  "upstream_sha256": "646f53d68f2d2d147146ffaeb85047ded8b813dcb1c104d8f0ec36ca609eb5bf",
+  "downstream_commit": null,
+  "import_date": "2026-10-14",
+  "model": "quilt",
+  "note": "首次公开导入为源码快照；不包含私有历史、运行凭据或构建产物。"
+}
